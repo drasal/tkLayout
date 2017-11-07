@@ -362,9 +362,6 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
 
       // Assign TLegend position 
       std::string legendPosition = "topLeft";
-      if(tag == "triplet"){
-        legendPosition = "bottomRight";
-      }
 
       // a) Resolution in Pt
       TCanvas canvasResPtLin(std::string("ResPtLin_"+scenario+"_"+tag).c_str(),"",vis_std_canvas_sizeY,vis_min_canvas_sizeY);
