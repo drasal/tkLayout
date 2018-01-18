@@ -30,6 +30,8 @@
 #include "VisitorMatTrack.h"
 #include "Units.h"
 
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 //
 // AnalyzerResolution constructor
 //
@@ -282,31 +284,35 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
     for (int i=0; i<4; i++) {
 
       const std::map<int,TrackCollection>* taggedTrackCollectionMap = nullptr;
-      std::string scenario, scenarioName, webScenarioName;
+      std::string scenario, scenarioName, webScenarioName, momentumType;
 
       if (i==0) {
         taggedTrackCollectionMap = &m_taggedTrackPtCollectionMap[tag];
         scenario                 = "withMS_Pt";
         scenarioName             = "const p_{T}";
         webScenarioName          = "const pt";
+        momentumType             = "p_{T}";
       }
       if (i==1) {
         taggedTrackCollectionMap = &m_taggedTrackPtCollectionMapIdeal[tag];
         scenario                 = "noMS_Pt";
         scenarioName             = "const p_{T}";
         webScenarioName          = "const pt";
+        momentumType             = "p_{T}";
       }
       if (i==2) {
         taggedTrackCollectionMap = &m_taggedTrackPCollectionMap[tag];
         scenario                 = "withMS_P";
         scenarioName             = "const p";
         webScenarioName          = scenarioName;
+        momentumType             = "p";
       }
       if (i==3) {
         taggedTrackCollectionMap = &m_taggedTrackPCollectionMapIdeal[tag];
         scenario                 = "noMS_P";
         scenarioName             = "const p";
         webScenarioName          = scenarioName;
+        momentumType             = "p";
       }
 
       // Histogram arrays[momenta] - array of profile histograms for different momenta
@@ -318,13 +324,13 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
       std::vector<unique_ptr<TProfile>> profHisArray_CotgTheta;
       std::vector<unique_ptr<TProfile>> profHisArray_CTau;
 
-      preparePlot(profHisArray_Pt       , "pT"       , scenarioName, *taggedTrackCollectionMap);
-      preparePlot(profHisArray_P        , "p"        , scenarioName, *taggedTrackCollectionMap);
-      preparePlot(profHisArray_D0       , "d0"       , scenarioName, *taggedTrackCollectionMap);
-      preparePlot(profHisArray_Z0       , "z0"       , scenarioName, *taggedTrackCollectionMap);
-      preparePlot(profHisArray_Phi0     , "phi0"     , scenarioName, *taggedTrackCollectionMap);
-      preparePlot(profHisArray_CotgTheta, "cotgTheta", scenarioName, *taggedTrackCollectionMap);
-      preparePlot(profHisArray_CTau     , "ctau"     , scenarioName, *taggedTrackCollectionMap);
+      preparePlot(profHisArray_Pt       , "pT"       , scenarioName, *taggedTrackCollectionMap, tag);
+      preparePlot(profHisArray_P        , "p"        , scenarioName, *taggedTrackCollectionMap, tag);
+      preparePlot(profHisArray_D0       , "d0"       , scenarioName, *taggedTrackCollectionMap, tag);
+      preparePlot(profHisArray_Z0       , "z0"       , scenarioName, *taggedTrackCollectionMap, tag);
+      preparePlot(profHisArray_Phi0     , "phi0"     , scenarioName, *taggedTrackCollectionMap, tag);
+      preparePlot(profHisArray_CotgTheta, "cotgTheta", scenarioName, *taggedTrackCollectionMap, tag);
+      preparePlot(profHisArray_CTau     , "ctau"     , scenarioName, *taggedTrackCollectionMap, tag);
 
       std::string contentName = "";
       bool        contentVis  = true;
@@ -354,22 +360,35 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
       }
       RootWContent& myContentPlots = myPage.addContent(contentName, contentVis);
 
+      // Assign TLegend position 
+      std::string legendPosition = "topLeft";
+
       // a) Resolution in Pt
       TCanvas canvasResPtLin(std::string("ResPtLin_"+scenario+"_"+tag).c_str(),"",vis_std_canvas_sizeY,vis_min_canvas_sizeY);
       canvasResPtLin.SetGrid(1,1);
       canvasResPtLin.SetLogy(0);
       canvasResPtLin.SetFillColor(Palette::color_plot_background);
       canvasResPtLin.SetObjectStat(false);
+      auto legendResPtLin = prepareLegend(legendPosition); 
+      legendResPtLin->SetHeader(("Track "+momentumType+" [GeV]").c_str());
       for (auto itHis=profHisArray_Pt.begin(); itHis!=profHisArray_Pt.end(); itHis++) {
 
         if (itHis==profHisArray_Pt.begin()) (*itHis)->Draw("PE1");
         else                                (*itHis)->Draw("PE1 SAME");
+        // extract track (transverse) momentum from plotName, and add to legend 
+        auto plotName = (*itHis)->GetName();
+        std::vector<std::string> tokens;
+        boost::algorithm::split(tokens, plotName, boost::algorithm::is_any_of("_"));
+        std::string trkMomentum = tokens.back();
+        legendResPtLin->AddEntry( (*itHis)->GetName(), trkMomentum.c_str(), "l");
       }
+      legendResPtLin->Draw();
 
       RootWImage& myImageLinPt = myContentPlots.addImage(canvasResPtLin, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImageLinPt.setComment("Transverse momentum resolution vs. "+web_etaLetter+" (lin. scale) - " + webScenarioName.c_str() + " across "+web_etaLetter);
       myImageLinPt.setName(Form("linptres_%s_%s", tag.c_str(), scenario.c_str()));
 
+      // as above with log scale
       TCanvas canvasResPtLog(std::string("ResPtLog_"+scenario+"_"+tag).c_str(),"",vis_std_canvas_sizeY,vis_min_canvas_sizeY);
       canvasResPtLog.SetGrid(1,1);
       canvasResPtLog.SetLogy(1);
@@ -379,6 +398,7 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
         if (itHis==profHisArray_Pt.begin()) (*itHis)->Draw("PE1");
         else                                (*itHis)->Draw("PE1 SAME");
       }
+      legendResPtLin->Draw(); // can use the same legend
       RootWImage& myImageLogPt = myContentPlots.addImage(canvasResPtLog, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImageLogPt.setComment("Transverse momentum resolution vs. "+web_etaLetter+" (log. scale) - " + webScenarioName.c_str() + " across "+web_etaLetter);
       myImageLogPt.setName(Form("logptres_%s_%s", tag.c_str(), scenario.c_str()));
@@ -387,6 +407,8 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
 
       // b) Resolution in P
       TCanvas canvasResP(std::string("ResP_"+scenario+"_"+tag).c_str(),"",vis_std_canvas_sizeY,vis_min_canvas_sizeY);
+      auto legendResP = prepareLegend(legendPosition); 
+      legendResP->SetHeader(("Track "+momentumType+" [GeV]").c_str());
       canvasResP.SetGrid(1,1);
       canvasResP.SetLogy(1);
       canvasResP.SetFillColor(Palette::color_plot_background);
@@ -395,7 +417,14 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
 
         if (itHis==profHisArray_P.begin()) (*itHis)->Draw("PE1");
         else                               (*itHis)->Draw("PE1 SAME");
+        // extract track (transverse) momentum from plotName, and add to legend 
+        auto plotName = (*itHis)->GetName();
+        std::vector<std::string> tokens;
+        boost::algorithm::split(tokens, plotName, boost::algorithm::is_any_of("_"));
+        std::string trkMomentum = tokens.back();
+        legendResP->AddEntry( (*itHis)->GetName(), trkMomentum.c_str(), "l");
       }
+      legendResP->Draw();
 
       RootWImage& myImageP = myContentPlots.addImage(canvasResP, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImageP.setComment("Momentum resolution vs. "+web_etaLetter+" - " + webScenarioName.c_str() + " across "+web_etaLetter);
@@ -405,6 +434,8 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
 
       // c) Resolution in D0
       TCanvas canvasResD0(std::string("ResD0_"+scenario+"_"+tag).c_str(),"",vis_std_canvas_sizeY,vis_min_canvas_sizeY);
+      auto legendResD0 = prepareLegend(legendPosition); 
+      legendResD0->SetHeader(("Track "+momentumType+" [GeV]").c_str());
       canvasResD0.SetGrid(1,1);
       canvasResD0.SetLogy(1);
       canvasResD0.SetFillColor(Palette::color_plot_background);
@@ -412,7 +443,14 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
 
         if (itHis==profHisArray_D0.begin()) (*itHis)->Draw("PE1");
         else                                (*itHis)->Draw("PE1 SAME");
+        // extract track (transverse) momentum from plotName, and add to legend 
+        auto plotName = (*itHis)->GetName();
+        std::vector<std::string> tokens;
+        boost::algorithm::split(tokens, plotName, boost::algorithm::is_any_of("_"));
+        std::string trkMomentum = tokens.back();
+        legendResD0->AddEntry( (*itHis)->GetName(), trkMomentum.c_str(), "l");
       }
+      legendResD0->Draw();
 
       RootWImage& myImageD0 = myContentPlots.addImage(canvasResD0, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImageD0.setComment("d0 resolution vs. "+web_etaLetter+" - " + webScenarioName.c_str() + " across "+web_etaLetter);
@@ -425,11 +463,20 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
       canvasResZ0.SetGrid(1,1);
       canvasResZ0.SetLogy(1);
       canvasResZ0.SetFillColor(Palette::color_plot_background);
+      auto legendResZ0 = prepareLegend(legendPosition); 
+      legendResZ0->SetHeader(("Track "+momentumType+" [GeV]").c_str());
       for (auto itHis=profHisArray_Z0.begin(); itHis!=profHisArray_Z0.end(); itHis++) {
 
         if (itHis==profHisArray_Z0.begin()) (*itHis)->Draw("PE1");
         else                                (*itHis)->Draw("PE1 SAME");
+        // extract track (transverse) momentum from plotName, and add to legend 
+        auto plotName = (*itHis)->GetName();
+        std::vector<std::string> tokens;
+        boost::algorithm::split(tokens, plotName, boost::algorithm::is_any_of("_"));
+        std::string trkMomentum = tokens.back();
+        legendResZ0->AddEntry( (*itHis)->GetName(), trkMomentum.c_str(), "l");
       }
+      legendResZ0->Draw();
 
       RootWImage& myImageZ0 = myContentPlots.addImage(canvasResZ0, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImageZ0.setComment("z0 resolution vs. "+web_etaLetter+" - " + webScenarioName.c_str() + " across "+web_etaLetter);
@@ -442,11 +489,20 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
       canvasResPhi0.SetGrid(1,1);
       canvasResPhi0.SetLogy(1);
       canvasResPhi0.SetFillColor(Palette::color_plot_background);
+      auto legendResPhi0 = prepareLegend(legendPosition); 
+      legendResPhi0->SetHeader(("Track "+momentumType+" [GeV]").c_str());
       for (auto itHis=profHisArray_Phi0.begin(); itHis!=profHisArray_Phi0.end(); itHis++) {
 
         if (itHis==profHisArray_Phi0.begin()) (*itHis)->Draw("PE1");
         else                                  (*itHis)->Draw("PE1 SAME");
+        // extract track (transverse) momentum from plotName, and add to legend 
+        auto plotName = (*itHis)->GetName();
+        std::vector<std::string> tokens;
+        boost::algorithm::split(tokens, plotName, boost::algorithm::is_any_of("_"));
+        std::string trkMomentum = tokens.back();
+        legendResPhi0->AddEntry( (*itHis)->GetName(), trkMomentum.c_str(), "l");
       }
+      legendResPhi0->Draw();
 
       RootWImage& myImagePhi0 = myContentPlots.addImage(canvasResPhi0, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImagePhi0.setComment(web_phiLetter + "0 resolution vs. "+web_etaLetter+" - " + webScenarioName.c_str() + " across "+web_etaLetter);
@@ -459,11 +515,21 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
       canvasResCotgTh.SetGrid(1,1);
       canvasResCotgTh.SetLogy(1);
       canvasResCotgTh.SetFillColor(Palette::color_plot_background);
+      auto legendResCotgTh = prepareLegend(legendPosition); 
+      legendResCotgTh->SetHeader(("Track "+momentumType+" [GeV]").c_str());
       for (auto itHis=profHisArray_CotgTheta.begin(); itHis!=profHisArray_CotgTheta.end(); itHis++) {
 
         if (itHis==profHisArray_CotgTheta.begin()) (*itHis)->Draw("PE1");
         else                                       (*itHis)->Draw("PE1 SAME");
+        // Extract track momentum
+        // extract track (transverse) momentum from plotName, and add to legend 
+        auto plotName = (*itHis)->GetName();
+        std::vector<std::string> tokens;
+        boost::algorithm::split(tokens, plotName, boost::algorithm::is_any_of("_"));
+        std::string trkMomentum = tokens.back();
+        legendResCotgTh->AddEntry( (*itHis)->GetName(), trkMomentum.c_str(), "l");
       }
+      legendResCotgTh->Draw();
 
       RootWImage& myImageCtg = myContentPlots.addImage(canvasResCotgTh, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImageCtg.setComment("Ctg("+web_thetaLetter+") resolution vs. "+web_etaLetter+" - " + webScenarioName.c_str() + " across "+web_etaLetter);
@@ -476,11 +542,20 @@ bool AnalyzerResolution::visualize(RootWSite& webSite)
       canvasResCTau.SetGrid(1,1);
       canvasResCTau.SetLogy(1);
       canvasResCTau.SetFillColor(Palette::color_plot_background);
+      auto legendResCTau = prepareLegend(legendPosition); 
+      legendResCTau->SetHeader(("Track "+momentumType+" [GeV]").c_str());
       for (auto itHis=profHisArray_CTau.begin(); itHis!=profHisArray_CTau.end(); itHis++) {
 
         if (itHis==profHisArray_CTau.begin()) (*itHis)->Draw("PE1");
         else                                  (*itHis)->Draw("PE1 SAME");
+        // extract track (transverse) momentum from plotName, and add to legend 
+        auto plotName = (*itHis)->GetName();
+        std::vector<std::string> tokens;
+        boost::algorithm::split(tokens, plotName, boost::algorithm::is_any_of("_"));
+        std::string trkMomentum = tokens.back();
+        legendResCTau->AddEntry( (*itHis)->GetName(), trkMomentum.c_str(), "l");
       }
+      legendResCTau->Draw();
 
       RootWImage& myImageCTau = myContentPlots.addImage(canvasResCTau, vis_std_canvas_sizeX, vis_min_canvas_sizeY);
       myImageCTau.setComment("c"+web_tauLetter+" resolution vs. "+web_etaLetter+" - " + webScenarioName.c_str() + " across "+web_etaLetter);
@@ -539,10 +614,41 @@ const CsvTextBuilder& AnalyzerResolution::getCsvHitCol() const
   else throw std::invalid_argument( "CsvTextBuilder::getCsvHitCol() - csvHitCol not defined (null reference), check!!!" );
 }
 
+
+
+//
+// Prepare legend: initialize a TLegend object with a location based on the input string: topLeft, topRight, bottomLeft, bottomRight
+//
+TLegend * AnalyzerResolution::prepareLegend(std::string position)
+{
+  std::vector<float> bottomLeft  = {0.1, 0.1, 0.2, 0.3};
+  std::vector<float> bottomRight = {0.7, 0.1, 0.9, 0.3};
+  std::vector<float> topRight    = {0.7, 0.7, 0.9, 0.9};
+  std::vector<float> topLeft     = {0.1, 0.7, 0.3, 0.9};
+
+  std::vector<float> myPosition;
+  if (position == "topLeft"){
+    myPosition = topLeft;
+  }
+  if (position == "topRight"){
+    myPosition = topRight;
+  }
+  if (position == "bottomLeft"){
+    myPosition = bottomLeft;
+  }
+  if (position == "bottomRight"){
+    myPosition = bottomRight;
+  }
+
+  TLegend * leg = new TLegend(myPosition.at(0), myPosition.at(1), myPosition.at(2), myPosition.at(3));
+  return leg;
+}
+
+
 //
 // Prepare plot: fill with data & set properties; varType specifies variable type to be filled: pT, p, d0, z0, phi0, cotgTheta
 //
-void AnalyzerResolution::preparePlot(std::vector<unique_ptr<TProfile>>& profHisArray, std::string varType, std::string scenario, const std::map<int, TrackCollection>& mapCollection)
+void AnalyzerResolution::preparePlot(std::vector<unique_ptr<TProfile>>& profHisArray, std::string varType, std::string scenario, const std::map<int, TrackCollection>& mapCollection, std::string tag)
 {
   // Momentum counter for color setting
   unsigned int iMomentum =0;
@@ -556,31 +662,31 @@ void AnalyzerResolution::preparePlot(std::vector<unique_ptr<TProfile>>& profHisA
     std::string title("");
     std::string name("");
     if (varType=="pT") {
-      name  = "pT_vs_eta"+any2str(momentum/Units::GeV);
+      name  = "pT_vs_eta_"+any2str(momentum/Units::GeV);
       title = "p_{T} resolution versus #eta - "+scenario+" across #eta;#eta;#delta p_{T}/p_{T} [%]";
     }
     else if (varType=="p") {
-      name  = "p_vs_eta"+any2str(momentum/Units::GeV);
+      name  = "p_vs_eta_"+any2str(momentum/Units::GeV);
       title = "p resolution versus #eta - "+scenario+" across #eta;#eta;#delta p/p [%]";
     }
     else if (varType=="d0") {
-      name  = "d0_vs_eta"+any2str(momentum/Units::GeV);
+      name  = "d0_vs_eta_"+any2str(momentum/Units::GeV);
       title = "Transverse impact parameter error - "+scenario+" across #eta;#eta;#delta d_{0} [#mum]";
     }
     else if (varType=="z0") {
-      name  = "z0_vs_eta"+any2str(momentum/Units::GeV);
+      name  = "z0_vs_eta_"+any2str(momentum/Units::GeV);
       title = "Longitudinal impact parameter error - "+scenario+" across #eta;#eta;#delta z_{0} [#mum]";
     }
     else if (varType=="phi0") {
-      name  = "phi0_vs_eta"+any2str(momentum/Units::GeV);
+      name  = "phi0_vs_eta_"+any2str(momentum/Units::GeV);
       title = "Track azimuthal angle error - "+scenario+" across #eta;#eta;#delta #phi [deg]";
     }
     else if (varType=="cotgTheta") {
-      name  = "cotgTh_vs_eta"+any2str(momentum/Units::GeV);
+      name  = "cotgTh_vs_eta_"+any2str(momentum/Units::GeV);
       title = "Track polar angle error - "+scenario+" across #eta;#eta;#delta ctg(#theta)";
     }
     else if (varType=="ctau") {
-      name  = "ctau_vs_eta"+any2str(momentum/Units::GeV);
+      name  = "ctau_vs_eta_"+any2str(momentum/Units::GeV);
       title = "c#tau resolution - "+scenario+" across #eta;#eta;#delta c#tau [#mum]";
     }
     std::unique_ptr<TProfile> profHis(new TProfile(name.c_str(), title.c_str(), c_nBins, 0, SimParms::getInstance().getMaxEtaCoverage()));

@@ -16,6 +16,7 @@
 #include <AnalyzerUnit.h>
 #include "global_constants.h"
 #include "Track.h"
+#include <TLegend.h>
 
 class BarrelModule;
 class CsvTextBuilder;
@@ -68,8 +69,11 @@ class AnalyzerResolution : public AnalyzerUnit {
 
  private:
 
+  //! Prepare TLegend: the string specifies the legend position (topLeft, bottomLeft, topRight, bottomRight)
+  TLegend * prepareLegend(std::string);
+
   //! Prepare plot: fill with data & set properties; varType specifies variable type to be filled: pT, p, d0, z0, phi0, cotgTheta & scenario const pT,  const p
-  void preparePlot(std::vector<unique_ptr<TProfile>>& profHisArray, std::string varType, std::string scenario, const std::map<int, TrackCollection>& mapCollection);
+  void preparePlot(std::vector<unique_ptr<TProfile>>& profHisArray, std::string varType, std::string scenario, const std::map<int, TrackCollection>& mapCollection, std::string tag);
 
   //! Prepare summary content table
   void prepareSummaryTable(std::string tag, std::string scenario, RootWPage& webPage, RootWContent& summaryContent, CsvTextBuilder& csvContainer);
